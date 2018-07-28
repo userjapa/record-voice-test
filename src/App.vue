@@ -164,6 +164,11 @@ export default {
 $color-mic: #D14444;
 $color-player: #D1D1D1;
 
+html, body {
+  height: 100%;
+  width: 100%;
+}
+
 #app {
   font-family: 'Avenir', Helvetica, Arial, sans-serif;
   text-align: center;
