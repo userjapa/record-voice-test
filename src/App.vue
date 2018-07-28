@@ -20,9 +20,9 @@
     <div class="player" v-if="audioEnabled">
       <audio ref="player"
              :src="url"
+             @loadedmetadata="loaded($event.target)"
              @playing="playing = true"
              @pause="playing = false"
-             @loadeddata="duration = $event.target.duration"
              @timeupdate="time = $event.target.currentTime"
              @loadstart="reset"/>
       <button class="player__btn"
@@ -38,12 +38,26 @@
              step="0.01"
              @change="timeChanged(time)">
     </div>
+    <div class="download" v-if="url">
+      <a :href="url" download="record.wav">
+        <button :disabled="downloading"
+                @click="download()">
+          Download
+        </button>
+      </a>
+    </div>
   </div>
 </template>
 
 <script>
 const mediaDevices = window.navigator.mediaDevices
 const MediaRecorder = window.MediaRecorder
+const Blob = window.Blob
+const Audio = window.Audio
+const URL = window.URL
+
+const isFirefox = typeof InstallTrigger !== 'undefined'
+const isChrome = !!window.chrome && !!window.chrome.webstore
 
 export default {
   name: 'app',
@@ -55,10 +69,11 @@ export default {
       recorder: null,
       audioChunks: [],
       // url: null,
-      url: 'https://vignette.wikia.nocookie.net/leagueoflegends/images/b/b1/Aatrox_002.ogg/revision/latest?cb=20180612205314',
+      url: null,
       playing: false,
       duration: 0,
-      time: 0
+      time: 0,
+      downloading: false
     }
   },
   computed: {
@@ -72,8 +87,25 @@ export default {
       this.audioChunks.push(ev.data)
     },
     convertChunk () {
-      // 
-      // this.$set(this, 'url', )
+      const audioBlob = new Blob(this.audioChunks, {
+        type: 'audio/wav'
+      })
+      const audioUrl = URL.createObjectURL(audioBlob)
+      // if (isChrome) {
+      //   const audio = new Audio(audioUrl)
+      //   console.log(audio);
+      //   console.log(audio.duration);
+      //   this.$set(this, 'duration', audio.duration)
+      // }
+      this.$set(this, 'url', audioUrl)
+      this.$set(this, 'audioChunks', [])
+    },
+    loaded (audio) {
+      let duration = 0
+      // if (isFirefox)
+      duration = audio.duration
+      console.log(duration);
+      this.$set(this, 'duration', duration)
     },
     timeChanged (time) {
       if (this.url) {
@@ -96,19 +128,30 @@ export default {
     recordStart () {
       this.recording = true
       const recorder = new MediaRecorder(this.stream)
-      recorder.addEventListener("dataavailable", this.addChunk)
+      recorder.addEventListener('dataavailable', this.addChunk)
+      recorder.addEventListener('stop', this.convertChunk)
       this.$set(this, 'recorder', recorder)
       this.recorder.start()
     },
-    recordStop () {
+    async recordStop () {
+      this.recorder.stop()
       this.recording = false
+    },
+    download () {
+      this.downloading = true
+      setTimeout(() => {
+        this.downloading = false
+      }, 1500)
     }
   },
   async beforeMount () {
     try {
-      const stream = await mediaDevices.getUserMedia({ audio: true })
-      this.$set(this, 'stream', stream)
-      this.audioEnabled = true
+      if (isFirefox || isChrome) {
+        const stream = await mediaDevices.getUserMedia({ audio: true })
+        this.$set(this, 'stream', stream)
+        this.audioEnabled = true
+      }
+      else alert('Browser not Supported!')
     } catch (error) {
       console.warn(error)
       alert('Failed to GET Audio Source!')
@@ -238,6 +281,39 @@ $color-player: #D1D1D1;
       }
       &::-moz-range-progress  {
         background-color: darken($color-player, 15);
+      }
+    }
+  }
+  .download {
+    margin-top: 10px;
+    a, button {
+      &:active,
+      &:focus {
+        outline: none;
+      }
+      &::-moz-focus-inner {
+        border: none;
+      }
+    }
+    button {
+      padding: .5em 1em;
+      border: 3px solid $color-player;
+      border-radius: .5em;
+      background-color: $color-player;
+      font-size: 1.75em;
+      cursor: pointer;
+      transition: all .2s;
+      &:hover {
+        background-color: darken($color-player, 5);
+        border-color: darken($color-player, 5);
+        &:active {
+          background-color: darken($color-player, 10);
+          border-color: darken($color-player, 10);
+        }
+      }
+      &:disabled {
+        background-color: lighten($color-player, 10);
+        border-color: lighten($color-player, 10);
       }
     }
   }
